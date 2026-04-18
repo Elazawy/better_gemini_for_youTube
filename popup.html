@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Gemini Resizer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 280px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #1f1f1f;
+      color: #fff;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #3c3c3c;
+    }
+
+    .header-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .section {
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      color: #9aa0a6;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .text-size-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #2d2d2d;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #5f6368;
+      background: transparent;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: #4285f4;
+      border-color: #4285f4;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    .size-display {
+      flex: 1;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e8eaed;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px solid #5f6368;
+      color: #e8eaed;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #e8eaed;
+    }
+
+    .info {
+      font-size: 11px;
+      color: #9aa0a6;
+      text-align: center;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px;
+      background: #2d2d2d;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #34a853;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #34a853;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .keyboard-shortcuts {
+      background: #2d2d2d;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .keyboard-shortcuts h3 {
+      font-size: 11px;
+      color: #9aa0a6;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .shortcut {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      padding: 4px 0;
+    }
+
+    .shortcut-key {
+      background: #3c3c3c;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon"></div>
+    <h1>YouTube Gemini Resizer</h1>
+  </div>
+
+  <div class="status">
+    <span class="status-dot"></span>
+    <span>Extension Active</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Text Size</div>
+    <div class="text-size-control">
+      <button class="btn" id="decreaseBtn" title="Decrease text size">A-</button>
+      <span class="size-display" id="sizeDisplay">14px</span>
+      <button class="btn" id="increaseBtn" title="Increase text size">A+</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <button class="reset-btn" id="resetBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/>
+        <path d="M3 3v9h9"/>
+      </svg>
+      Reset to Default
+    </button>
+  </div>
+
+  <div class="keyboard-shortcuts">
+    <h3>Resize Handles</h3>
+    <div class="shortcut">
+      <span>Right edge</span>
+      <span class="shortcut-key">Drag ↔</span>
+    </div>
+    <div class="shortcut">
+      <span>Bottom edge</span>
+      <span class="shortcut-key">Drag ↕</span>
+    </div>
+    <div class="shortcut">
+      <span>Corner</span>
+      <span class="shortcut-key">Drag ↘</span>
+    </div>
+  </div>
+
+  <div class="info">
+    Resize the Gemini AI window by dragging the blue handles that appear on the container edges.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

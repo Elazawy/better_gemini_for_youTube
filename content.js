@@ -401,6 +401,172 @@
     applyFontSize(settings.fontSize);
   }
 
+  const RESPONSE_SELECTORS = [
+    'model-turn',
+    '[data-content-type="model"]',
+    '[data-message-author-role="model"]',
+    '[data-author="model"]',
+    '[role="alert"]',
+    '[class*="assistant"][class*="turn"]',
+    '[class*="model"][class*="turn"]',
+    '.model-response-text',
+    '.conversation-turn:not(.user-turn)'
+  ];
+  const RESPONSE_SELECTOR = RESPONSE_SELECTORS.join(', ');
+  let copyInjectScheduled = false;
+
+  function normalizeMultilineText(text) {
+    return (text || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function extractResponseText(turn) {
+    const clone = turn.cloneNode(true);
+    clone.querySelectorAll('.gemini-response-actions, .gemini-copy-btn, .gemini-text-controls, .gemini-resize-handle, button[aria-label*="Thumbs"], button[aria-label*="thumbs"], button[aria-label*="إعجاب"], button[aria-label*="عدم الإعجاب"]').forEach((el) => {
+      el.remove();
+    });
+    return normalizeMultilineText(clone.innerText || clone.textContent || '');
+  }
+
+  function isLikelyResponseTurn(turn) {
+    if (!(turn instanceof HTMLElement)) return false;
+    if (turn.classList.contains('gemini-response-actions')) return false;
+    if (turn.matches('[data-content-type="user"], [data-message-author-role="user"], [data-author="user"]')) return false;
+    if (turn.querySelector('[contenteditable="true"], textarea, input[type="text"], input:not([type])')) return false;
+
+    const hints = [
+      turn.getAttribute('data-content-type'),
+      turn.getAttribute('data-message-author-role'),
+      turn.getAttribute('data-author'),
+      turn.className,
+      turn.id,
+      turn.getAttribute('aria-label')
+    ].join(' ').toLowerCase();
+
+    const hasUserHint = hints.includes('user') || hints.includes('prompt') || hints.includes('input');
+    const hasModelHint = hints.includes('model') || hints.includes('assistant') || hints.includes('response');
+    if (hasUserHint && !hasModelHint) return false;
+
+    const text = extractResponseText(turn);
+    if (!text) return false;
+    if (text.includes('قد يعرض الذكاء الاصطناعي معلومات خاطئة')) return false;
+    if (text.toLowerCase().includes('ai may display inaccurate information')) return false;
+
+    return true;
+  }
+
+  function getResponseTurns() {
+    if (!geminiContainer) return [];
+
+    return Array.from(geminiContainer.querySelectorAll(RESPONSE_SELECTOR)).filter((turn) => {
+      if (!isLikelyResponseTurn(turn)) return false;
+      return turn.closest(RESPONSE_SELECTOR) === turn;
+    });
+  }
+
+  async function copyTextToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (fallbackErr) {
+        console.error('Gemini copy fallback failed:', fallbackErr);
+      }
+
+      textarea.remove();
+      if (!copied) {
+        console.error('Gemini copy failed:', err);
+      }
+      return copied;
+    }
+  }
+
+  function setCopyButtonLabel(button, label) {
+    const labelEl = button.querySelector('.gemini-copy-label');
+    if (labelEl) labelEl.textContent = label;
+  }
+
+  function injectCopyButtons() {
+    const turns = getResponseTurns();
+    turns.forEach((turn) => {
+      if (turn.dataset.geminiCopyInjected === 'true') return;
+      if (turn.nextElementSibling?.classList.contains('gemini-response-actions')) {
+        turn.dataset.geminiCopyInjected = 'true';
+        return;
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'gemini-response-actions';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'gemini-copy-btn';
+      btn.setAttribute('aria-label', 'Copy response');
+      btn.innerHTML = `
+        <svg class="gemini-copy-icon" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span class="gemini-copy-label">Copy</span>
+      `;
+
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+
+        const text = extractResponseText(turn);
+        if (!text) {
+          setCopyButtonLabel(btn, 'No text');
+          setTimeout(() => setCopyButtonLabel(btn, 'Copy'), 1200);
+          return;
+        }
+
+        btn.disabled = true;
+        setCopyButtonLabel(btn, 'Copying...');
+        const copied = await copyTextToClipboard(text);
+        btn.disabled = false;
+
+        if (copied) {
+          btn.classList.add('gemini-copy-success');
+          setCopyButtonLabel(btn, 'Copied!');
+          setTimeout(() => {
+            btn.classList.remove('gemini-copy-success');
+            setCopyButtonLabel(btn, 'Copy');
+          }, 1500);
+          return;
+        }
+
+        setCopyButtonLabel(btn, 'Failed');
+        setTimeout(() => setCopyButtonLabel(btn, 'Copy'), 1500);
+      });
+
+      actions.appendChild(btn);
+      turn.insertAdjacentElement('afterend', actions);
+      turn.dataset.geminiCopyInjected = 'true';
+    });
+  }
+
+  function scheduleCopyButtonInjection() {
+    if (copyInjectScheduled) return;
+    copyInjectScheduled = true;
+    window.requestAnimationFrame(() => {
+      copyInjectScheduled = false;
+      injectCopyButtons();
+    });
+  }
+
   // Initialize resizer
   async function initializeResizer() {
     geminiContainer = findGeminiContainer();
@@ -432,6 +598,9 @@
 
       // Create text size controls
       createTextSizeControls();
+
+      // Add copy buttons for existing responses
+      scheduleCopyButtonInjection();
 
       // Add resize observer to maintain handles
       const resizeObserver = new ResizeObserver(() => {
@@ -472,6 +641,8 @@
       if (!geminiContainer || !document.contains(geminiContainer)) {
         initializeResizer();
       }
+      // Inject copy buttons on any DOM change inside the Gemini panel
+      scheduleCopyButtonInjection();
     });
 
     geminiObserver.observe(document.body, {
@@ -492,6 +663,8 @@
     if (!geminiContainer || !document.contains(geminiContainer)) {
       initializeResizer();
     }
+    // Periodically inject copy buttons for newly-streamed responses
+    scheduleCopyButtonInjection();
   }, 1000);
 
   console.log('YouTube Gemini Resizer: Extension loaded');

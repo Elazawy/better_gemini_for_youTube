@@ -333,3 +333,99 @@ html.dark-theme .gemini-resizer-active > div > div:last-child {
     color: #e8eaed !important;
   }
 }
+
+/* ── Copy-response button ─────────────────────────────────────────── */
+.gemini-response-actions {
+  display: flex;
+  align-items: center;
+  margin: 6px 0 10px 8px;
+}
+
+.gemini-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #adb5bd;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+  user-select: none;
+  z-index: 10;
+}
+
+.gemini-copy-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.gemini-copy-btn:hover {
+  background: rgba(66, 133, 244, 0.18);
+  border-color: rgba(66, 133, 244, 0.5);
+  color: #8ab4f8;
+}
+
+.gemini-copy-btn:active {
+  transform: scale(0.96);
+}
+
+/* "Copied!" success state */
+.gemini-copy-btn.gemini-copy-success {
+  background: rgba(52, 168, 83, 0.2);
+  border-color: rgba(52, 168, 83, 0.5);
+  color: #81c995;
+}
+
+.gemini-copy-icon {
+  flex-shrink: 0;
+}
+
+.gemini-copy-label {
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
+
+/* Light-mode overrides */
+@media (prefers-color-scheme: light) {
+  .gemini-copy-btn {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.04);
+    color: #5f6368;
+  }
+
+  .gemini-copy-btn:hover {
+    background: rgba(66, 133, 244, 0.1);
+    border-color: rgba(66, 133, 244, 0.4);
+    color: #1a73e8;
+  }
+
+  .gemini-copy-btn.gemini-copy-success {
+    background: rgba(52, 168, 83, 0.12);
+    border-color: rgba(52, 168, 83, 0.4);
+    color: #188038;
+  }
+}
+
+html:not([dark]):not(.dark-theme) .gemini-copy-btn {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.04);
+  color: #5f6368;
+}
+
+html:not([dark]):not(.dark-theme) .gemini-copy-btn:hover {
+  background: rgba(66, 133, 244, 0.1);
+  border-color: rgba(66, 133, 244, 0.4);
+  color: #1a73e8;
+}
+
+html:not([dark]):not(.dark-theme) .gemini-copy-btn.gemini-copy-success {
+  background: rgba(52, 168, 83, 0.12);
+  border-color: rgba(52, 168, 83, 0.4);
+  color: #188038;
+}

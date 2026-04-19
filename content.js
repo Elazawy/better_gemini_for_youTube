@@ -725,6 +725,80 @@
     }
   });
 
+  /** Clean up all layout modifications when Gemini panel is closed/removed. */
+  function cleanupOnClose() {
+    console.log('YouTube Gemini Resizer: Gemini panel closed, cleaning up layout');
+
+    // Remove resize handles, text controls, and active class from the old container
+    if (geminiContainer) {
+      geminiContainer.querySelectorAll('.gemini-resize-handle').forEach(h => h.remove());
+      geminiContainer.querySelectorAll('.gemini-text-controls').forEach(c => c.remove());
+      geminiContainer.classList.remove('gemini-resizer-active');
+      geminiContainer.style.width = '';
+      geminiContainer.style.minWidth = '';
+      geminiContainer.style.flex = '';
+      geminiContainer.style.height = '';
+      geminiContainer.style.minHeight = '';
+      geminiContainer.style.maxHeight = '';
+      geminiContainer.style.opacity = '';
+      geminiContainer.style.visibility = '';
+      geminiContainer.style.zIndex = '';
+      geminiContainer.style.position = '';
+      geminiContainer.style.userSelect = '';
+    }
+
+    // Reset #secondary, #primary, and #panels to undo layout changes
+    const secondary = document.querySelector('#secondary');
+    if (secondary) {
+      secondary.style.width = '';
+      secondary.style.minWidth = '';
+      secondary.style.flex = '';
+    }
+    const primary = document.querySelector('#primary');
+    if (primary) {
+      primary.style.maxWidth = '';
+      primary.style.flex = '';
+      primary.style.minWidth = '';
+    }
+    const panels = document.querySelector('#panels');
+    if (panels) {
+      panels.style.width = '';
+    }
+
+    // Remove injected copy buttons
+    document.querySelectorAll('.gemini-response-actions').forEach(el => el.remove());
+    document.querySelectorAll('[data-gemini-copy-injected]').forEach(el => {
+      delete el.dataset.geminiCopyInjected;
+    });
+
+    // Remove injected font-size style tag
+    const fontStyle = document.getElementById('gemini-font-size-style');
+    if (fontStyle) fontStyle.remove();
+
+    // Reset container reference so it can be re-detected
+    geminiContainer = null;
+  }
+
+  /** Check if the Gemini panel is actually visible (not just in the DOM). */
+  function isGeminiPanelVisible() {
+    if (!geminiContainer || !document.contains(geminiContainer)) return false;
+
+    // Check if the panel or a close ancestor is hidden via display/visibility
+    const style = window.getComputedStyle(geminiContainer);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+    // Also check the engagement panel's visibility attribute
+    // YouTube uses the 'visibility' attribute (not CSS) on engagement panels
+    const engagementPanel = geminiContainer.closest('ytd-engagement-panel-section-list-renderer');
+    if (engagementPanel) {
+      const vis = engagementPanel.getAttribute('visibility');
+      // YouTube uses 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED' when open
+      if (vis && !vis.includes('EXPANDED')) return false;
+    }
+
+    return true;
+  }
+
   // Watch for Gemini container to appear
   function startObserving() {
     // Initial check
@@ -733,6 +807,13 @@
     // Set up mutation observer
     geminiObserver = new MutationObserver((mutations) => {
       if (isFullscreen) return; // Skip while fullscreen
+
+      // If we had a container but it's gone or hidden, clean up
+      if (geminiContainer && !isGeminiPanelVisible()) {
+        cleanupOnClose();
+        return;
+      }
+
       // Check if Gemini container appeared
       if (!geminiContainer || !document.contains(geminiContainer)) {
         initializeResizer();
@@ -767,6 +848,13 @@
   // Also check periodically for the container
   setInterval(() => {
     if (isFullscreen) return; // Skip while fullscreen
+
+    // If we had a container but it's gone or hidden, clean up
+    if (geminiContainer && !isGeminiPanelVisible()) {
+      cleanupOnClose();
+      return;
+    }
+
     if (!geminiContainer || !document.contains(geminiContainer)) {
       initializeResizer();
     }

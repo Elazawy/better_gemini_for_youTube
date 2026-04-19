@@ -5,9 +5,12 @@ A Chrome extension that allows you to resize the Gemini AI window and text on Yo
 ## Features
 
 - **Resize Window**: Drag the right, bottom, or corner resize handle to adjust the Gemini AI window size
+- **Smart Layout**: Automatically scales the video player and recommendations when expanding the AI window
+- **Copy Responses**: Quick one-click "Copy" button added to all AI responses
 - **Text Size Control**: Increase or decrease text size with A+/A- buttons
+- **Fullscreen Aware**: Automatically disables the resizer when the video enters full-screen mode
 - **Persistent Settings**: Your preferred window size and text size are saved
-- **Dark Mode Support**: Works with YouTube's dark theme
+- **Dark Mode Support**: Works seamlessly with YouTube's dark theme
 
 ## Installation
 
@@ -36,7 +39,9 @@ Coming soon...
    - **A-**: Decrease text size
    - **A+**: Increase text size
 
-5. Click the extension icon in the toolbar for quick text size adjustments
+5. Click the "Copy" button under any AI response to quickly copy the text to your clipboard.
+
+6. Click the extension icon in the toolbar for quick text size adjustments
 
 ## File Structure
 
@@ -59,9 +64,11 @@ The extension injects a content script into YouTube pages that:
 
 1. Detects when the Gemini AI sidebar/window appears
 2. Adds resize handles (right, bottom, corner) to the container
-3. Adds text size controls (A-/A+ buttons) to the UI
-4. Persists user preferences using Chrome storage API
-5. Automatically applies saved settings when Gemini opens
+3. Injects "Copy" buttons below all AI responses
+4. Adds text size controls (A-/A+ buttons) to the UI
+5. Adjusts the page layout (video width and recommendations) as you resize
+6. Persists user preferences using Chrome storage API
+7. Automatically cleans up layout modifications when closed or entering full-screen
 
 ## Customization
 
@@ -124,6 +131,12 @@ MIT License - Feel free to modify and distribute!
 Pull requests are welcome! For major changes, please open an issue first.
 
 ## Changelog
+
+### v1.1.0
+- Added one-click "Copy" button to AI responses
+- Improved resizing logic to scale the video and recommendations columns dynamically
+- Added full-screen detection to temporarily disable resizer in full-screen mode
+- Fixed layout bug where recommendations stayed collapsed after closing the AI window
 
 ### v1.0.0
 - Initial release

@@ -18,6 +18,36 @@
 
 /* Hover effect moved to main handle style above */
 
+/* Left resize handle */
+.gemini-resize-left {
+  top: 50%;
+  left: 4px;
+  width: 8px;
+  height: 40px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+  border-radius: 4px;
+  border: 2px solid #4285f4;
+}
+
+.gemini-resize-left::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 24px;
+  background-color: #fff;
+  border-radius: 1px;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.gemini-resize-left:hover {
+  background: rgba(66, 133, 244, 0.8);
+}
+
 /* Right resize handle */
 .gemini-resize-right {
   top: 50%;
@@ -166,10 +196,13 @@
 .gemini-resizer-active {
   min-width: 300px !important;
   min-height: 200px !important;
-  max-width: 100vw !important;
   max-height: none !important;
+  /* CSS-level safety net: never wider than the viewport */
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
   resize: none !important;
-  /* Don't force overflow, let YouTube handle it */
+  /* Prevent horizontal overflow in split-screen mode */
+  overflow-x: hidden !important;
   /* Ensure proper layering and visibility */
   z-index: 2147483646 !important;
   opacity: 1 !important;
@@ -178,8 +211,15 @@
   background-color: rgba(32, 33, 36, 0.98) !important;
   /* Ensure the container is properly positioned */
   transform: none !important;
-  /* Make sure it works well with flex layouts */
-  flex-shrink: 0 !important;
+  /* Allow shrinking when viewport is too narrow */
+  flex-shrink: 1 !important;
+}
+
+/* Ensure #secondary never overflows when it contains the resized panel */
+#secondary:has(.gemini-resizer-active) {
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
 }
 
 /* Override for light theme */

@@ -100,14 +100,15 @@
     const existingHandles = container.querySelectorAll('.gemini-resize-handle');
     existingHandles.forEach(h => h.remove());
 
-    // Create handle positions
-    const positions = ['right', 'bottom', 'corner'];
+    // Create handle positions – include 'left' so users can drag the edge
+    // nearest the video player to widen/narrow the panel.
+    const positions = ['left', 'right', 'bottom', 'corner'];
 
     positions.forEach(pos => {
       const handle = document.createElement('div');
       handle.className = `gemini-resize-handle gemini-resize-${pos}`;
       handle.dataset.position = pos;
-      handle.title = pos === 'right' ? 'Drag to resize width' :
+      handle.title = (pos === 'left' || pos === 'right') ? 'Drag to resize width' :
                      pos === 'bottom' ? 'Drag to resize height' : 'Drag to resize width and height';
       container.appendChild(handle);
 
@@ -144,18 +145,29 @@
     startWidth = rect.width;
     startHeight = rect.height;
 
-    // Keep the opposite edge unpinned so each handle resizes in one direction.
+    // For fixed/absolute containers, pin the top/left edges so the resize
+    // handle stays anchored while dragging.  For the vertical axis we always
+    // do this; for the horizontal axis we ONLY switch from right→left anchor
+    // when the panel is right-anchored AND fixed/absolute, because switching
+    // unnecessarily breaks the width math in split-screen mode.
     const computedStyle = window.getComputedStyle(geminiContainer);
     const currentPosition = computedStyle.position;
     if (currentPosition === 'fixed' || currentPosition === 'absolute') {
       if (currentResizeHandle === 'right' || currentResizeHandle === 'corner') {
-        geminiContainer.style.left = `${rect.left}px`;
-        geminiContainer.style.right = 'auto';
+        // Dragging right -> firmly anchor left so it grows to the right
+        geminiContainer.style.setProperty('left', `${rect.left}px`, 'important');
+        geminiContainer.style.setProperty('right', 'auto', 'important');
+      } else if (currentResizeHandle === 'left') {
+        // Dragging left -> firmly anchor right so it grows to the left
+        const rightPx = window.innerWidth - rect.right;
+        geminiContainer.style.setProperty('right', `${rightPx}px`, 'important');
+        geminiContainer.style.setProperty('left', 'auto', 'important');
       }
 
       if (currentResizeHandle === 'bottom' || currentResizeHandle === 'corner') {
-        geminiContainer.style.top = `${rect.top}px`;
-        geminiContainer.style.bottom = 'auto';
+        // Dragging bottom -> firmly anchor top
+        geminiContainer.style.setProperty('top', `${rect.top}px`, 'important');
+        geminiContainer.style.setProperty('bottom', 'auto', 'important');
       }
     }
 
@@ -192,19 +204,37 @@
   function applyContainerWidth(width) {
     if (!geminiContainer) return;
 
-    // Prevent the container from being wider than the screen minus a reasonable video player width
-    const maxAllowedWidth = Math.max(MIN_WIDTH, window.innerWidth - 350);
-    const newWidth = Math.min(Math.max(MIN_WIDTH, Math.round(width)), maxAllowedWidth);
+    // Hard-clamp to viewport width so the panel can NEVER overflow the screen,
+    // regardless of layout mode (fullscreen, split-screen, etc.).
+    // For in-flow panels (inside #secondary), also cap at 70% of viewport so
+    // the video player always remains usable.
+    const viewportW = window.innerWidth;
+    const computedStyle = window.getComputedStyle(geminiContainer);
+    const isInFlow = computedStyle.position === 'relative' || computedStyle.position === 'static';
 
-    geminiContainer.style.width = `${newWidth}px`;
-    geminiContainer.style.minWidth = `${newWidth}px`;
-    geminiContainer.style.flex = `0 0 ${newWidth}px`;
+    // Absolute maximum: never wider than the viewport minus a small gutter.
+    let maxAllowedWidth = Math.max(MIN_WIDTH, viewportW - 48);
+
+    if (isInFlow) {
+      // Leave at least 30% of the viewport for the video player.
+      maxAllowedWidth = Math.min(maxAllowedWidth, Math.max(MIN_WIDTH, Math.floor(viewportW * 0.7)));
+    }
+
+    let newWidth = Math.min(Math.max(MIN_WIDTH, Math.round(width)), maxAllowedWidth);
+
+    // Apply the width first…
+    geminiContainer.style.setProperty('width', `${newWidth}px`, 'important');
+    geminiContainer.style.setProperty('min-width', `${newWidth}px`, 'important');
+    geminiContainer.style.setProperty('max-width', `${newWidth}px`, 'important');
+    geminiContainer.style.setProperty('flex', `0 0 ${newWidth}px`, 'important');
 
     const secondary = geminiContainer.closest('#secondary');
     if (secondary) {
-      secondary.style.width = `${newWidth}px`;
-      secondary.style.minWidth = `${newWidth}px`;
-      secondary.style.flex = `0 0 ${newWidth}px`;
+      secondary.style.setProperty('width', `${newWidth}px`, 'important');
+      secondary.style.setProperty('max-width', `${newWidth}px`, 'important');
+      secondary.style.setProperty('flex', `0 0 ${newWidth}px`, 'important');
+      // Do NOT set minWidth — that forces overflow in narrow viewports.
+      secondary.style.minWidth = '';
 
       const primary = document.querySelector('#primary');
       if (primary) {
@@ -217,6 +247,31 @@
     const panels = geminiContainer.closest('#panels');
     if (panels) {
       panels.style.width = '100%';
+    }
+
+    // …then POST-CHECK for left-edge overflow and shrink if needed.
+    // We do this AFTER applying the width so the browser reflows and we
+    // can read the actual bounding rect with the new size.
+    const postRect = geminiContainer.getBoundingClientRect();
+    if (postRect.left < 0) {
+      // The panel overflows the left edge — shrink to fit.
+      const corrected = Math.max(MIN_WIDTH, Math.round(newWidth + postRect.left - 12));
+      if (corrected < newWidth) {
+        newWidth = corrected;
+        geminiContainer.style.setProperty('width', `${newWidth}px`, 'important');
+        geminiContainer.style.setProperty('min-width', `${newWidth}px`, 'important');
+        geminiContainer.style.setProperty('max-width', `${newWidth}px`, 'important');
+        geminiContainer.style.setProperty('flex', `0 0 ${newWidth}px`, 'important');
+        if (secondary) {
+          secondary.style.setProperty('width', `${newWidth}px`, 'important');
+          secondary.style.setProperty('max-width', `${newWidth}px`, 'important');
+          secondary.style.setProperty('flex', `0 0 ${newWidth}px`, 'important');
+          const primary = document.querySelector('#primary');
+          if (primary) {
+            primary.style.maxWidth = `calc(100% - ${newWidth + 24}px)`;
+          }
+        }
+      }
     }
   }
 
@@ -245,7 +300,18 @@
     const deltaX = touch.clientX - startX;
     const deltaY = (touch.clientY + window.scrollY) - startPageY;
 
-    if (currentResizeHandle === 'right') {
+    // For in-flow panels (inside #secondary on the right side of the page)
+    // the "right" resize handle sits on the RIGHT edge of the panel, BUT
+    // YouTube's layout means the panel grows to the LEFT. The handle itself
+    // is on the right, so dragging it RIGHT should still add width (positive
+    // deltaX → wider). This is the natural direction, no inversion needed.
+    //
+    // For fixed/absolute panels pinned from the left (we set left in
+    // startResize), dragging right also naturally adds width.
+    if (currentResizeHandle === 'left') {
+      // Left handle: dragging LEFT (negative deltaX) should WIDEN the panel
+      applyContainerWidth(startWidth - deltaX);
+    } else if (currentResizeHandle === 'right') {
       applyContainerWidth(startWidth + deltaX);
     } else if (currentResizeHandle === 'bottom') {
       let nextDeltaY = deltaY;
@@ -279,12 +345,20 @@
     document.removeEventListener('touchmove', doResize, { capture: true });
     document.removeEventListener('touchend', stopResize, true);
 
-    // Save the new dimensions
+    // Post-resize bounds check: if the panel overflows the left edge
+    // (common in split-screen), shrink it to fit.
     if (geminiContainer) {
       const rect = geminiContainer.getBoundingClientRect();
+      if (rect.left < 0) {
+        const fittingWidth = rect.width + rect.left - 12;
+        applyContainerWidth(Math.max(MIN_WIDTH, fittingWidth));
+      }
+
+      // Save the new dimensions AFTER clamping so the persisted value is valid.
+      const finalRect = geminiContainer.getBoundingClientRect();
       loadSettings().then(settings => {
-        settings.width = rect.width;
-        settings.height = rect.height;
+        settings.width = finalRect.width;
+        settings.height = finalRect.height;
         saveSettings(settings);
       });
     }
@@ -295,6 +369,7 @@
   // Get cursor style
   function getCursorForPosition(position) {
     switch (position) {
+      case 'left': return 'ew-resize';
       case 'right': return 'ew-resize';
       case 'bottom': return 'ns-resize';
       case 'corner': return 'nwse-resize';
@@ -311,15 +386,36 @@
       const currentPosition = computedStyle.position;
 
       if (currentPosition !== 'static') {
+        // applyContainerWidth will internally clamp to viewport, so just
+        // pass the saved value — it will be capped automatically.
         applyContainerWidth(settings.width);
         applyContainerHeight(settings.height);
 
         if (currentPosition === 'fixed' || currentPosition === 'absolute') {
           const rect = geminiContainer.getBoundingClientRect();
-          if (rect.left < window.innerWidth / 2) {
-            geminiContainer.style.left = `${rect.left}px`;
-            geminiContainer.style.right = 'auto';
+          // If the panel is off-screen to the left, push it back.
+          if (rect.left < 0) {
+            geminiContainer.style.setProperty('left', '0px', 'important');
+            geminiContainer.style.setProperty('right', 'auto', 'important');
+          } else if (rect.left < window.innerWidth / 2) {
+            geminiContainer.style.setProperty('left', `${rect.left}px`, 'important');
+            geminiContainer.style.setProperty('right', 'auto', 'important');
+          } else {
+            // Explicitly lock the right anchor to override YouTube's !important CSS
+            // which can interfere with width changes.
+            const rightPx = Math.max(0, window.innerWidth - rect.right);
+            geminiContainer.style.setProperty('right', `${rightPx}px`, 'important');
+            geminiContainer.style.setProperty('left', 'auto', 'important');
           }
+        }
+
+        // Fallback overflow guard for ALL panel types (in-flow, fixed, etc.).
+        // If the panel's left edge is still negative after clamping, shrink
+        // further until it fits within the viewport.
+        const postRect = geminiContainer.getBoundingClientRect();
+        if (postRect.left < 0) {
+          const fittingWidth = postRect.width + postRect.left - 12;
+          applyContainerWidth(Math.max(MIN_WIDTH, fittingWidth));
         }
       }
 
@@ -601,6 +697,7 @@
       geminiContainer.style.position = '';
       geminiContainer.style.width = '';
       geminiContainer.style.minWidth = '';
+      geminiContainer.style.maxWidth = '';
       geminiContainer.style.flex = '';
       geminiContainer.style.height = '';
       geminiContainer.style.minHeight = '';
@@ -613,6 +710,7 @@
     if (secondary) {
       secondary.style.width = '';
       secondary.style.minWidth = '';
+      secondary.style.maxWidth = '';
       secondary.style.flex = '';
     }
     const primary = document.querySelector('#primary');
@@ -735,6 +833,7 @@
       geminiContainer.classList.remove('gemini-resizer-active');
       geminiContainer.style.width = '';
       geminiContainer.style.minWidth = '';
+      geminiContainer.style.maxWidth = '';
       geminiContainer.style.flex = '';
       geminiContainer.style.height = '';
       geminiContainer.style.minHeight = '';
@@ -751,6 +850,7 @@
     if (secondary) {
       secondary.style.width = '';
       secondary.style.minWidth = '';
+      secondary.style.maxWidth = '';
       secondary.style.flex = '';
     }
     const primary = document.querySelector('#primary');
@@ -835,13 +935,29 @@
   // Handle window resize to prevent container from overflowing screen
   let windowResizeTimer = null;
   window.addEventListener('resize', () => {
-    if (isFullscreen) return;
+    if (isFullscreen || isResizing) return;
     clearTimeout(windowResizeTimer);
-    windowResizeTimer = setTimeout(() => {
+    windowResizeTimer = setTimeout(async () => {
       if (geminiContainer && isGeminiPanelVisible()) {
-        applySettings();
+        // Use the SAVED width setting, not the current rect.width, because
+        // the current rect may already be overflowing the viewport.
+        // applyContainerWidth will re-clamp it to fit.
+        const settings = await loadSettings();
+        applyContainerWidth(settings.width);
+
+        // After applying, verify the panel is within bounds.
+        const rect = geminiContainer.getBoundingClientRect();
+        if (rect.left < 0) {
+          // Still overflowing — force-shrink to what actually fits.
+          const fittingWidth = rect.width + rect.left - 12;
+          if (fittingWidth >= MIN_WIDTH) {
+            applyContainerWidth(fittingWidth);
+          } else {
+            applyContainerWidth(MIN_WIDTH);
+          }
+        }
       }
-    }, 100);
+    }, 150);
   });
 
   // YouTube may toggle fullscreen via its player without using the native
